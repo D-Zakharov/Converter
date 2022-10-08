@@ -1,0 +1,90 @@
+<script>
+    var serviceUrl = "http://localhost:5170";
+    var pauseInterval = 1500;
+    var guid;
+
+    function _(el) {
+        return document.getElementById(el);
+    }
+
+    function createGuid() {
+        function S4() {
+            return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
+        }
+        return (S4() + S4() + "-" + S4() + "-4" + S4().substr(0, 3) + "-" + S4() + "-" + S4() + S4() + S4()).toLowerCase();
+    }
+
+    function uploadFile() {
+        guid = createGuid();
+        var file = _("Content").files[0];
+        var formdata = new FormData();
+        formdata.append("Content", file);
+        formdata.append("IdempotencyKey", guid);
+
+        var ajax = new XMLHttpRequest();
+
+        ajax.upload.addEventListener("progress", progressHandler, false);
+        ajax.addEventListener("load", completeHandler, false);
+        ajax.addEventListener("error", errorHandler, false);
+        ajax.addEventListener("abort", abortHandler, false);
+        ajax.open("POST", serviceUrl + "/api/v1/convert/HtmlToPdf");
+
+        ajax.send(formdata);
+    }
+
+    async function startWaitingForResult() {
+        var isReceived = false;
+        var url = serviceUrl + "/api/v1/convert/CheckResult?requestKey=" + guid;
+
+        let response = await fetch(url);
+        let json = await response.json();
+        isReceived = json.isReady;
+
+        if (!isReceived) {
+            setTimeout(startWaitingForResult, pauseInterval);
+        }
+        else {
+            downloadFile();
+        }
+    }
+
+    function downloadFile() {
+        var link = document.createElement("a");
+        link.download = name;
+        link.href = serviceUrl + "/api/v1/convert/GetResult?requestKey="+guid;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        delete link;
+        _("status").innerHTML = "Finished";
+    }
+
+    function progressHandler(event) {
+        _("loaded_n_total").innerHTML = "Uploaded " + event.loaded + " bytes of " + event.total;
+        var percent = (event.loaded / event.total) * 100;
+        _("progressBar").value = Math.round(percent);
+        _("status").innerHTML = Math.round(percent) + "% uploaded... please wait";
+    }
+
+    function completeHandler(event) {
+        _("status").innerHTML = "File was uploaded, waiting for conversion...";
+        _("progressBar").value = 0;
+        setTimeout(startWaitingForResult, pauseInterval);
+    }
+
+    function errorHandler(event) {
+        _("status").innerHTML = "Upload Failed";
+    }
+
+    function abortHandler(event) {
+        _("status").innerHTML = "Upload Aborted";
+    }
+</script>
+
+
+<form id="upload_form" enctype="multipart/form-data" method="post">
+    <input type="file" name="Content" id="Content" onchange="uploadFile()"><br>
+    <progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
+    <h3 id="status"></h3>
+    <p id="loaded_n_total"></p>
+</form>
