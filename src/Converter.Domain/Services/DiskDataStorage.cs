@@ -13,7 +13,6 @@ namespace Converter.Domain.Services
     /// <summary>
     /// хранилище представляет собой папку в файловой системе
     /// </summary>
-    [StorageType(StorageTypes.Disk)]
     public class DiskDataStorage : AbstractDataStorage
     {
         private readonly string _folderPath;
